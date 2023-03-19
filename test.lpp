@@ -1,0 +1,14 @@
+struct str
+{
+    age: i32,
+    ID: i64,
+    fc: f64
+}
+
+fn main()
+{
+    let mut a = 15;
+    let mut b = 12;
+    a = a + b * a - b + (a / b) * a;
+    return 5;
+}
