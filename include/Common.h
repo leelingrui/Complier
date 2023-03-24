@@ -19,10 +19,15 @@
 
 namespace lpp
 {
+    std::string get_type_name(llvm::Type* type);
     using status = long long;
     class DFA
     {
     public:
+        enum class DFA_PROCESS_TYPE
+        {
+            S, R
+        };
         using DFA_STATUS_CHANGE_NODE = std::variant<status, std::function<void()>>;
         DFA(size_t status_size = 0, status start = 0);
         bool load(std::istream& input_stream);

@@ -6,16 +6,86 @@
 #include <Lexer.h>
 #include <Common.h>
 #include <string>
+#include <fstream>
 #include <llvm/ADT/SmallString.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Function.h>
-#include <list>
+#include <llvm/IR/ValueSymbolTable.h>
 #include <TypeSymbolTable.h>
+#include <llvm/ADT/ArrayRef.h>
+#include <list>
 
 namespace lpp
 {
+    class BlockScopeNode;
+    class NameSpaceManager;
+
+    class BlockScopeManager final
+    {
+    public:
+        BlockScopeManager();
+        void enter_scope(llvm::StringRef Name);
+        void enter_scope();
+        void leave_scope();
+        void insert_function(llvm::Module* m, std::string Name, llvm::Type* return_type, llvm::ArrayRef<llvm::Type*> Args, bool is_static = false, bool is_var_ags = false);
+        const std::pair<llvm::Function*, bool> find_function(llvm::StringRef Name) const;
+        BlockScopeNode* find_value(llvm::StringRef Name);
+        llvm::ArrayRef<llvm::Value*> get_current_value_accept_seq();
+        bool variable_define(llvm::StringRef Name, size_t _pointer_level);
+        bool type_define(llvm::StringRef Name);
+        void find_and_enter(llvm::StringRef Name);
+        void clear_tmp_scope();
+        std::string get_function_name();
+    private:
+        std::vector<llvm::Value*> element_pointer_seq;
+        std::unique_ptr<BlockScopeNode> root_node;
+        std::list<BlockScopeNode*> search_scope;
+        BlockScopeNode* current_node, *tmp_node;
+    };
+
+    class BlockScopeNode
+    {
+    public:
+        BlockScopeNode(llvm::StringRef Name, BlockScopeNode* _parent = nullptr, llvm::Value* _Value = nullptr, size_t _pointer_level = 0);
+        const std::pair<llvm::Function*, bool> get_function(llvm::StringRef Name);
+        BlockScopeNode* get_child_block(llvm::StringRef Name);
+        void insert_function(llvm::StringRef Name, std::pair<llvm::Function*, bool> Func);
+        bool insert_member_value(llvm::StringRef Name, llvm::Value* _Value, size_t _pointer_level);
+        void set_parent(BlockScopeNode* _parent);
+        void allocate(llvm::Value* value_ptr, llvm::Type* _type);
+        inline void set_current_value(llvm::Value* _value, llvm::Type* _type)
+        {
+            current_value = _value;
+            value_type = _type;
+        }
+        inline llvm::Type* get_type() { return value_type; };
+        inline llvm::Value* get_address() { return current_value; };
+        inline BlockScopeNode* get_parent() { return parent; };
+        inline void set_type(llvm::Type* _type) { value_type = _type; };
+        inline bool is_root() { return !name.size(); };
+    private:
+        llvm::Type* value_type;
+        size_t pointer_level;
+        llvm::Value* current_value,* StructPointerNo;
+        std::string name;
+        size_t name_no;
+        BlockScopeNode* parent;
+        llvm::StringMap<std::unique_ptr<BlockScopeNode>> childs;
+        llvm::StringMap<std::pair<llvm::Function*, bool>> member_functions;
+        friend class BlockScopeManager;
+    };
+    
+    using FuncParam = struct FunctionParameters
+    {
+        llvm::SmallString<256> function_name;
+        std::vector<llvm::Type*> arg_type;
+        std::vector<llvm::SmallString<256>> arg_name;
+        llvm::Type* return_type;
+        void clear();
+    };
+
     class TokenObjCmp
     {
     public:
@@ -24,28 +94,62 @@ namespace lpp
     class Parser final : public DFA
     {
     public: 
+        class HashToken
+        {
+        public:
+            size_t operator()(const TokenObj& _token) const;
+        };
         using parser_input = std::variant<llvm::Value*, llvm::Type*, llvm::Function*, Token>;
         enum ParserInputType
         {
             value, type, function, token
         };
         Parser();
-        Parser(std::string_view source_file);
-        void init_node(status strat, const parser_input& status_change, DFA_STATUS_CHANGE_NODE end);
-        void next_status(parser_input next);
+        Parser(std::istream* source_file);
+        void parse();
+        void init_node(status strat, const TokenObj& status_change, DFA_STATUS_CHANGE_NODE end);
+        void init_all_node(status start, DFA_STATUS_CHANGE_NODE end);
+        void init_all_keyword(status start, DFA_STATUS_CHANGE_NODE end);
+        void init_all_punc(status start, DFA_STATUS_CHANGE_NODE end);
+        void override_node(status start, const TokenObj& status_change, DFA_STATUS_CHANGE_NODE end);
     private:
-        static llvm::LLVMContext context;
+        Lexer lexer;
+        void next_status();
+        llvm::LLVMContext context;
+        llvm::Module* mod;
         std::vector<std::map<parser_input, status>> goto_table;
         size_t exprs;
+        Token current_input;
+        size_t pointer_level;
         std::deque<parser_input> process_stack;
         std::stack<parser_input> symbol_stack;
+        llvm::Value* parser_input_to_value(const parser_input & input);
+        BlockScopeNode* token_to_llvm_ptr(const Identifier & token);
+        std::pair<llvm::Function*, llvm::Value*> take_invocable(llvm::ArrayRef<llvm::Value*> Args);
+        bool get_next_token();
+        bool check_sizeof(const parser_input& input) const;
         void reduce_operatorbrace();
-        void reduce_rbraces();
+        void reduce_rparenthese();
         void reduce_expr();
-        std::map<status, std::map<parser_input, DFA_STATUS_CHANGE_NODE>> status_change_map;
+        void get_function_name();
+        void define_pointer();
+        void define_again();
+        void define_finished();
+        void define_variable();
+        void check_priority();
+        bool check_priority(const Punchation punc);
+        void reduce_rbrackets();
+        inline bool static current_token_is_star(const Token& _Token);
+        void back_ward_solve_expr();
+        void clear_process_stack();
+        static bool invocable(const parser_input& tken);
+        void sovle_unary(Punchation punc);
+        llvm::Value* get_value(parser_input& input, llvm::Type* rvalue_type = nullptr, bool load_effective_address = false);
+        void precess_tokens();
+        BlockScopeManager block_scope_manager;
+        std::map<status, std::unordered_map<TokenObj, DFA_STATUS_CHANGE_NODE, HashToken, TokenObjCmp>> status_change_map;
         std::unique_ptr<StructTypeFinder> struct_finder;
         llvm::IRBuilder<> builder;
-        Lexer lexer;
         Token except_token;
         SymbolTable symbol_table;
         std::unordered_map<TokenObj, unsigned char, TokenObjHash, TokenObjCmp> priority_map = {
@@ -93,6 +197,8 @@ namespace lpp
             { Punchation(','), 15 },
             { KeyWord::AS, 1 }
         };
+        FuncParam func_param;
+        unsigned char last_priority;
     };
 
     class NameSpaceManager
@@ -105,8 +211,7 @@ namespace lpp
         std::string get_name();
     private:
         std::list<std::string> current_namespace, tmp_namespace;
-    }
-
+    };
 };
 
 #endif

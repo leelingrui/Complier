@@ -45,7 +45,9 @@ namespace lpp
         RBRACKETS = ']',      // 右中括号。
         LBRACES = '{',        // 左大括号。
         RBRACES = '}',        // 右大括号。
+        POSITIVE = '+',
         ADD = '+',            // 加。
+        NEGATIVE = '-',
         SUB = '-',
         MUL = '*',
         DEREF = '*',
@@ -55,6 +57,7 @@ namespace lpp
         LESSTHAN = '<',          // 22 小于。
         LARGETHAN = '>',
         BITAND = '&',
+        GETADDR = '&',
         BITOR = '|',
         BITXOR = '^',
         NOT = '!',
@@ -116,7 +119,8 @@ namespace lpp
         void operator()(const Punchation& var);
     private:
         std::ostream& output_stream;
-    };
+    };  
+
     using Token = struct lppToken
     {
     public:

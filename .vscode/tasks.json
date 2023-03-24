@@ -5,6 +5,15 @@
     },
     "tasks": [
         {
+            "label": "CMake",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "MinGW Makefiles",
+                ".."
+            ]
+        },
+        {
             "label": "MinGW build",
             "type": "shell",
             "command": "mingw32-make",

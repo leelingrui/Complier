@@ -40,10 +40,10 @@ namespace lpp
     //     }
     //     else return false;
     // }
-
     status DFA::get_current_status()
     {
-        return status_stack.top();
+        if (status_stack.size()) return status_stack.top();
+        else return 0;
     }
     llvm::Value* digit2llvmvlue::operator()(const Digit& digit)
     {
@@ -90,5 +90,36 @@ namespace lpp
             break;
         }
         return result;
+    }
+    std::string get_type_name(llvm::Type *type)
+    {
+        std::string name;
+        switch (static_cast<llvm::Type::TypeID>(type->getTypeID()))
+        {
+        case llvm::Type::TypeID::IntegerTyID:
+        {
+            name += 'i';
+            name += std::to_string(static_cast<llvm::IntegerType*>(type)->getBitWidth());
+            break;
+        }
+        case llvm::Type::TypeID::FloatTyID:
+        {
+            name += "float";
+            break;
+        }
+        case llvm::Type::TypeID::DoubleTyID:
+        {
+            name += "double";
+            break;
+        }
+        case llvm::Type::TypeID::StructTyID:
+        {
+            name += static_cast<llvm::IntegerType*>(type)->getStructName();
+            break;
+        }
+        default:
+            break;
+        }
+        return std::move(name);
     }
 }

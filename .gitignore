@@ -1,4 +1,8 @@
 third-party/bin
 third-party/lib
 build
+test.cpp
 ASSIGN.md
+*.xlsx
+*.ll
+*.lpp
