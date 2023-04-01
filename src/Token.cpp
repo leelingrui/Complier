@@ -69,6 +69,14 @@ namespace lpp
         return *this;
     }
 
+    lppToken& lppToken::operator=(lppToken & rvalue)
+    {
+        token = rvalue.token;
+        col = rvalue.col;
+        line = rvalue.line;
+        return *this;
+    }
+
     std::partial_ordering lppToken::operator<=>(const lppToken& rhs) const
     {
         switch (static_cast<TokenType>(rhs.token->index()))

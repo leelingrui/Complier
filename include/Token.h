@@ -129,6 +129,7 @@ namespace lpp
         lppToken() = default;
         lppToken(lppToken& _token);
         lppToken& operator=(lppToken && rvalue);
+        lppToken& operator=(lppToken & rvalue);
         lppToken(lppToken&& _token);
         lppToken(TokenObj _token, size_t _line, size_t _col);
         std::partial_ordering operator<=>(const lppToken& rhs) const;

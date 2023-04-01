@@ -91,7 +91,7 @@ namespace lpp
         }
         return result;
     }
-    std::string get_type_name(llvm::Type *type)
+    std::string get_type_name(const llvm::Type *type)
     {
         std::string name;
         switch (static_cast<llvm::Type::TypeID>(type->getTypeID()))
@@ -99,7 +99,7 @@ namespace lpp
         case llvm::Type::TypeID::IntegerTyID:
         {
             name += 'i';
-            name += std::to_string(static_cast<llvm::IntegerType*>(type)->getBitWidth());
+            name += std::to_string(static_cast<const llvm::IntegerType*>(type)->getBitWidth());
             break;
         }
         case llvm::Type::TypeID::FloatTyID:
@@ -114,7 +114,7 @@ namespace lpp
         }
         case llvm::Type::TypeID::StructTyID:
         {
-            name += static_cast<llvm::IntegerType*>(type)->getStructName();
+            name += static_cast<const llvm::IntegerType*>(type)->getStructName();
             break;
         }
         default:

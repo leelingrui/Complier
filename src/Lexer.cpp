@@ -6,9 +6,242 @@ namespace lpp
         root = allocator.allocate(1);
         new (root) Node();
     }
+
+    // use DFA will be better, wrong choice.
     Punchation Lexer::parse_mul_punc()
     {
-        return Punchation();
+        size_t token_size = 0;
+        Punchation punc;
+        switch (linebuf[column + token_size])
+        {
+        case '-':
+        {
+            token_size++;
+            switch (linebuf[column + token_size])
+            {
+            case '>':
+                punc = Punchation::POINTERTO;
+                column += 2;
+                break;
+            case '=':
+                punc = Punchation::SUBASSING;
+                column += 2;
+            default:
+                punc = Punchation::SUB;
+                column++;
+                break;
+            }
+            
+            break;
+        }
+        case ':':
+        {
+            token_size++;
+            if (linebuf[column + token_size] == ':')
+            {
+                column += 2;
+                punc = Punchation::SCOUP;
+            }
+            else
+            {
+                column++;
+                punc = Punchation::COLON;
+            }
+            break;
+        }
+        case '&':
+        {
+            token_size++;
+            switch (linebuf[column + token_size])
+            {
+            case '&':
+                column += 2;
+                punc = Punchation::AND;
+                break;
+            case '=':
+                column += 2;
+                punc = Punchation::ADDASSIGN;
+                break;
+            default:
+                column++;
+                punc = Punchation::BITAND;
+                break;
+            }
+            break;
+        }
+        case '|':
+        {
+            token_size++;
+            switch (linebuf[column + token_size])
+            {
+            case '|':
+                column += 2;
+                punc = Punchation::OR;
+                break;
+            case '=':
+                column += 2;
+                punc = Punchation::ORASSIGN;
+                break;
+            default:
+                column++;
+                punc = Punchation::BITOR;
+                break;
+            }
+            break;
+        }
+        case '*':
+        {
+            token_size++;
+            if (linebuf[column + token_size] == '=')
+            {
+                column += 2;
+                punc = Punchation::MULASSIGN;
+            }
+            else
+            {
+                column++;
+                punc = Punchation::MUL;
+            }
+            break;
+        }
+        case '>':
+        {
+            token_size++;
+            switch (linebuf[column + token_size])
+            {
+            case '>':
+                token_size++;
+                if (linebuf[column + token_size] == '=')
+                {
+                    punc = Punchation::RSHIFTASSIGN;
+                    column +=3;
+                }
+                else
+                {
+                    punc = Punchation::RSHIFT;
+                    column += 2;
+                }
+                break;
+            case '=':
+                column += 2;
+                punc = Punchation::LARGEEQ;
+                break;
+            default:
+                column++;
+                punc = Punchation::LARGETHAN;
+                break;
+            }
+            break;
+        }
+        case '<':
+        {
+            token_size++;
+            switch (linebuf[column + token_size])
+            {
+            case '>':
+                token_size++;
+                if (linebuf[column + token_size] == '=')
+                {
+                    punc = Punchation::LSHIFTASSIGN;
+                    column +=3;
+                }
+                else
+                {
+                    punc = Punchation::LSHIFT;
+                    column += 2;
+                }
+                break;
+            case '=':
+                column += 2;
+                punc = Punchation::LESSEQ;
+                break;
+            default:
+                column++;
+                punc = Punchation::LESSTHAN;
+                break;
+            }
+            break;
+        }case '+':
+        {
+            token_size++;
+            if (linebuf[column + token_size] == '=')
+            {
+                punc = Punchation::ADDASSIGN;
+                column += 2;
+            }
+            else
+            {
+                punc = Punchation::ADD;
+                column++;
+            }
+            break;
+        }
+        case '/':
+        {
+            token_size++;
+            if (linebuf[column + token_size] == '=')
+            {
+                punc = Punchation::DIVASSIGN;
+                column += 2;
+            }
+            else 
+            {
+                punc = Punchation::DIV;
+                column++;
+            }
+            break;
+        }
+        case '=':
+        {
+            token_size++;
+            if (linebuf[column + token_size] == '=')
+            {
+                punc = Punchation::EQU;
+                column += 2;
+            }
+            else 
+            {
+                punc = Punchation::ASSIGN;
+                column++;
+            }
+            break;
+        }
+        case '%':
+        {
+            token_size++;
+            if (linebuf[column + token_size] == '=')
+            {
+                punc = Punchation::MODASSIGN;
+                column += 2;
+            }
+            else 
+            {
+                punc = Punchation::MOD;
+                column++;
+            }
+            break;
+        }
+        case '^':
+        {
+            token_size++;
+            if (linebuf[column + token_size] == '=')
+            {
+                punc = Punchation::XORASSIGN;
+                column += 2;
+            }
+            else 
+            {
+                punc = Punchation::BITXOR;
+                column++;
+            }
+            break;
+        }
+        default:
+            punc = static_cast<Punchation>(linebuf[column]);
+            column++;
+            break;
+        }
+        return punc;
     }
     void Lexer::init_keyword(const std::vector<std::pair<std::string_view, TokenObj>> &key_words)
     {
@@ -73,24 +306,21 @@ namespace lpp
         }
         return _Ans;
     }
-    // llvm::StructType
     Token Lexer::get_next_token()
     {
         Node* current = root;
         size_t token_size = 0;
-        if (skip_blank()) return Token(Enter(), line, column);
+        if (skip_blank()) 
+        {
+            if (!source_file->eof() || linebuf.size())
+            {
+                return Token(Enter(), line, column);
+            }
+            else return Token(std::nullopt, line, column);
+        }
         if (ispunct(linebuf[column + token_size]) && linebuf[column + token_size] != '_')
         {
-            Punchation punc;
-            switch (linebuf[column + token_size])
-            {
-            case '-':case ':':case '&':case '|':case '*':case '>':case '<':case '+':case '/':
-                punc = parse_mul_punc();
-            default:
-                punc = static_cast<Punchation>(linebuf[column]);
-                break;
-            }
-            column++;
+            Punchation punc = parse_mul_punc();
             return Token(punc, line, column);
         }
         if (isdigit(linebuf[column + token_size])) 
@@ -263,13 +493,14 @@ namespace lpp
                 }
                 break;
             }
-            case ',': case ' ': case ';': case '\\': case '\t':
+            case ',': case ' ': case ';': case '\\': case '\t': case ')': case ']':
             {
                 if(value < LONG_MAX && value > LONG_MIN) digit = static_cast<long>(value);
                 else throw std::out_of_range("literal out of range for `i32`");
                 break;
             }
             default:
+                throw std::runtime_error("unexcept suffix");
                 break;
             }
             {
@@ -336,7 +567,7 @@ unsupport_isuffix:
             }
             else
             {
-                Token&& token = Token(Identifier(linebuf.substr(column, token_size)), line, column);
+                Token&& token = Token(current->token, line, column);
                 column += token_size;
                 return token;
             }
@@ -390,8 +621,8 @@ unsupport_isuffix:
                 if (!std::getline(*source_file, linebuf))
                 {
                     linebuf.clear();
-                    return true;
                 }
+                return true;
             }
         }
         return false;

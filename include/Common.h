@@ -19,7 +19,7 @@
 
 namespace lpp
 {
-    std::string get_type_name(llvm::Type* type);
+    std::string get_type_name(const llvm::Type* type);
     using status = long long;
     class DFA
     {
