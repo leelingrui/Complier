@@ -8,6 +8,7 @@ namespace lpp
         scope_count = 0;
         std::fstream lex("D:\\Cfile\\Complier\\Lethon.lex", std::ios::in);
         lexer.load(lex);
+        block_scope_manager.type_define("void", builder.getVoidTy());
         block_scope_manager.type_define("bool", builder.getInt1Ty());
         block_scope_manager.type_define("i8", builder.getInt8Ty());
         block_scope_manager.type_define("u8", builder.getInt8Ty());
@@ -15,8 +16,8 @@ namespace lpp
         block_scope_manager.type_define("u16", builder.getInt16Ty());
         block_scope_manager.type_define("i32", builder.getInt32Ty());
         block_scope_manager.type_define("u32", builder.getInt32Ty());
-        block_scope_manager.type_define("i64", builder.getInt32Ty());
-        block_scope_manager.type_define("u64", builder.getInt32Ty());
+        block_scope_manager.type_define("i64", builder.getInt64Ty());
+        block_scope_manager.type_define("u64", builder.getInt64Ty());
         block_scope_manager.type_define("f32", builder.getFloatTy());
         block_scope_manager.type_define("f64", builder.getDoubleTy());
     
@@ -26,8 +27,10 @@ namespace lpp
         init_node(0, Enter(), std::bind(&Parser::skip));
         init_node(0, Digit(), 2);
         init_all_punc(2, std::bind(static_cast<void(Parser::*)()>(&Parser::check_priority), this));
-        init_node(2, Enter(), std::bind(reduce_condition_calculate, this));
-        override_node(2, Punchation::LPARENTHESES, 0);
+        override_node(2, Punchation::LBRACES, std::bind(reduce_condition_calculate, this));
+        init_node(2, Enter(), std::bind(&Parser::skip));
+        override_node(2, Punchation::LPARENTHESES, std::bind(&Parser::enter_parentheses, this));
+        override_node(2, Punchation::RPARENTHESES, std::bind(&Parser::reduce_rparenthese, this));
         init_node(3, Punchation::MUL, std::bind(&Parser::define_pointer, this));
         init_node(3, TokenObj(Identifier()), std::bind(&Parser::define_variable, this));
         init_node(4, TokenObj(Punchation::COMMA), 5);
@@ -37,7 +40,7 @@ namespace lpp
         init_node(7, Identifier(), 2);
         init_all_punc(7, 2);
         init_node(7, Digit(), 2);
-        override_node(7, Punchation::LPARENTHESES, 7);
+        override_node(7, Punchation::LPARENTHESES, std::bind(&Parser::enter_parentheses, this));
         init_node(8, Identifier(), 9);
         init_node(9, Punchation::LPARENTHESES, std::bind(&Parser::get_function_name, this));
         init_node(10, Identifier(), 11);
@@ -46,6 +49,7 @@ namespace lpp
         init_node(11, Punchation::COLON, 12);
         init_node(12, Identifier(), std::bind(&Parser::get_argument, this));
         init_node(14, Punchation::LBRACES, std::bind(&Parser::function_body_define_strart, this));
+        init_node(14, Punchation::POINTERTO, 18);
         init_node(14, Enter(), std::bind(&Parser::skip));
         init_all_punc(15, 1);
         override_node(15, Punchation::RBRACES, std::bind(&Parser::function_body_define_finished, this));
@@ -61,7 +65,7 @@ namespace lpp
         init_all_punc(17, 1);
         init_node(17, Identifier(), 2);
         init_node(17, Digit(), 2);
-        init_node(18, Punchation::LBRACES, 19);
+        init_node(18, Identifier(), std::bind(&Parser::get_function_return_type, this));
         init_all_punc(19, 1);
         init_node(19, Identifier(), 2);
         init_node(19, Digit(), 2);
@@ -93,7 +97,8 @@ namespace lpp
         init_node(24, Identifier(), 2);
         init_node(24, Digit(), 2);
         init_node(25, Enter(), std::bind(&Parser::skip));
-        init_node(25, Punchation::LBRACES, 24);
+        init_node(25, Punchation::LBRACES, std::bind(&Parser::has_return_type_function_define, this));
+        init_node(25, Punchation::SEMICOLON, std::bind(&Parser::function_declear, this));
     }
 
     Parser::Parser(std::istream* source_file) : struct_finder(new StructTypeFinder), builder(context), pointer_level(0), last_priority(255)
@@ -137,6 +142,7 @@ namespace lpp
     std::pair<llvm::Function*, llvm::Value*> Parser::take_invocable(llvm::ArrayRef<llvm::Value*> Args)
     {
         std::pair<llvm::Function*, bool> callee;
+        std::pair<llvm::Function*, llvm::Value*> ret;
         bool flag = true;
         while (symbol_stack.size() && flag)
         {
@@ -208,14 +214,31 @@ namespace lpp
         }
         else
         {
-            return std::pair(callee.first, nullptr);
+            ret = std::pair(callee.first, nullptr);
         }
+        process_stack.pop_back();
+        return std::move(ret);
+    }
+
+    void Parser::leave_parentheses()
+    {
+        last_priority = priority_stack.top();
+        priority_stack.pop();
+    }
+
+    void Parser::enter_parentheses()
+    {
+        symbol_stack.emplace(std::move(current_input));
+        status_stack.push(7);
+        priority_stack.push(last_priority);
+        last_priority = UINT8_MAX;
     }
 
     void Parser::start_while_condition()
     {
         status_stack.push(23);
         CondParam *cond_param = new CondParam;
+        cond_param->clear();
         symbol_stack.push(cond_param);
         cond_param->entery_block = llvm::BasicBlock::Create(context);
         func_param.basic_blocks.push_back(cond_param->entery_block);
@@ -228,14 +251,13 @@ namespace lpp
     {
         status_stack.push(17);
         CondParam *cond_param = new CondParam;
+        cond_param->clear();
         symbol_stack.push(cond_param);
         block_scope_manager.enter_scope();
     }
 
     void Parser::end_while_body()
     {
-        status_stack.pop();
-        symbol_stack.pop();
         CondParam* cond_param = std::get<CondParam*>(symbol_stack.top());
         builder.CreateBr(cond_param->entery_block);
         builder.SetInsertPoint(cond_param->exit_block);
@@ -249,10 +271,7 @@ namespace lpp
     {
         status_stack.pop();
         status_stack.push(20);
-        parser_input tmp = std::move(symbol_stack.top());
-        symbol_stack.pop();
         CondParam* cond_param = std::get<CondParam*>(symbol_stack.top());
-        symbol_stack.push(std::move(tmp));
         BlockScopeNode* node = block_scope_manager.get_current_node();
         if (node->current_node_is_returned())
         {
@@ -260,7 +279,7 @@ namespace lpp
         }
         else
         {
-            cond_param->exit_block = llvm::BasicBlock::Create(context);
+            builder.CreateBr(cond_param->body2);
             builder.SetInsertPoint(cond_param->body2);
         }
         block_scope_manager.leave_scope();
@@ -289,11 +308,13 @@ namespace lpp
         {
             if (cond_param->exit_block)
             {
+                builder.CreateBr(cond_param->exit_block);
                 builder.SetInsertPoint(cond_param->exit_block);
             }
             else
             {
                 cond_param->entery_block = llvm::BasicBlock::Create(context);
+                func_param.basic_blocks.push_back(cond_param->exit_block);
                 builder.CreateBr(cond_param->exit_block);
                 builder.SetInsertPoint(cond_param->exit_block);
             }
@@ -386,6 +407,7 @@ namespace lpp
             except_token = std::move(std::get<Token>(process_stack.back()));
             throw std::runtime_error("unclosed brace");
         }
+        leave_parentheses();
     }
 
     void Parser::reduce_expr()
@@ -620,7 +642,8 @@ namespace lpp
             }
         }
         const llvm::DataLayout &DL = mod->getDataLayout();
-        block_scope_manager.set_function(mod.get(), func_param, ret_type, DL);
+        func_param.return_type = ret_type;
+        block_scope_manager.define_function(mod.get(), func_param, DL);
         block_scope_manager.leave_scope();
         status_stack.pop();
         symbol_stack.pop();
@@ -649,7 +672,7 @@ namespace lpp
             builder.CreateCondBr(cond, cond_param->body1, cond_param->body2);
             builder.SetInsertPoint(cond_param->body1);
             status_stack.pop();
-            status_stack.push(18);
+            status_stack.push(19);
             break;
         }
         case 23:
@@ -661,12 +684,38 @@ namespace lpp
             builder.CreateCondBr(cond, cond_param->body1, cond_param->exit_block);
             builder.SetInsertPoint(cond_param->body1);
             status_stack.pop();
-            status_stack.push(25);
+            status_stack.push(24);
             break;
         }
         default:
             break;
         }
+    }
+
+    void Parser::get_function_return_type()
+    {
+        Token func_return_type = std::move(current_input);
+        BlockScopeNode* block_scope = block_scope_manager.find_value(std::get<Identifier>(*func_return_type.token).name);
+        func_param.return_type = block_scope->get_type();
+        status_stack.pop();
+        status_stack.push(25);
+    }
+
+    void Parser::function_declear()
+    {
+        status_stack.pop();
+        symbol_stack.pop();
+        status_stack.pop();
+        symbol_stack.pop();
+        block_scope_manager.declear_function(mod.get(), func_param);
+    }
+
+    void Parser::has_return_type_function_define()
+    {
+        status_stack.pop();
+        symbol_stack.pop();
+        function_body_define_strart();
+        block_scope_manager.declear_function(mod.get(), func_param);
     }
 
     inline bool Parser::is_punc(const parser_input &_Token)
@@ -692,19 +741,15 @@ namespace lpp
     void Parser::check_if_body2()
     {
         CondParam* cond_param;
-        status_stack.pop();
-        symbol_stack.pop();
         cond_param = std::get<CondParam*>(symbol_stack.top());
         if (static_cast<TokenType>(current_input.token->index()) == TokenType::KEYWORD && std::get<KeyWord>(*current_input.token) == KeyWord::ELSE)
         {
             block_scope_manager.enter_scope();
-            builder.SetInsertPoint(cond_param->body2);
             status_stack.pop();
             status_stack.push(21);
         }
         else
         {
-            builder.SetInsertPoint(cond_param->body2);
             delete cond_param;
             status_stack.pop();
             symbol_stack.pop();
@@ -1183,22 +1228,29 @@ get_value:  punc = std::move(symbol_stack.top());
         current_node->is_func_root = true;
     }
 
-    void BlockScopeManager::set_function(llvm::Module *m, FuncParam params, llvm::Type* return_type, const llvm::DataLayout& DL)
+    void BlockScopeManager::declear_function(llvm::Module *m, FuncParam &func_param)
     {
         llvm::FunctionType* _Ft;
-        BlockScopeNode* _current_node;
         std::string func_name = get_function_name();
-        llvm::Value* rvalue, *lvalue;
-        params.inserter++;
-        llvm::IRBuilder<> builder(params.basic_blocks[0], params.inserter);
-        llvm::MaybeAlign Align;
-        if (params.is_static || tmp_node->get_parent()->is_root()) _Ft = llvm::FunctionType::get(return_type, params.arg_type, params.is_var_args);
+        if (func_param.is_static || tmp_node->get_parent()->is_root()) _Ft = llvm::FunctionType::get(func_param.return_type, func_param.arg_type, func_param.is_var_args);
         else
         {
-            params.arg_type.insert(params.arg_type.begin(), llvm::PointerType::get(m->getContext(), 0));
-            _Ft = llvm::FunctionType::get(return_type, params.arg_type, params.is_var_args);
+            func_param.arg_type.insert(func_param.arg_type.begin(), llvm::PointerType::get(m->getContext(), 0));
+            _Ft = llvm::FunctionType::get(func_param.return_type, func_param.arg_type, func_param.is_var_args);
         }
         llvm::Function* fn = llvm::Function::Create(_Ft, llvm::GlobalValue::LinkageTypes::ExternalLinkage, func_name, m);
+        current_node->set_function(std::pair(fn, func_param.is_static));
+    }
+
+    void BlockScopeManager::define_function(llvm::Module *m, FuncParam& params, const llvm::DataLayout& DL)
+    {
+        llvm::MaybeAlign Align;
+        llvm::Value* rvalue, *lvalue;
+        BlockScopeNode* _current_node;
+        params.inserter++;
+        llvm::IRBuilder<> builder(params.basic_blocks[0], params.inserter);
+        if (!current_node->get_function().first) declear_function(m, params);
+        llvm::Function* fn = current_node->get_function().first;
         for (llvm::BasicBlock* bb : params.basic_blocks)
         {
             bb->insertInto(fn);
@@ -1215,7 +1267,6 @@ get_value:  punc = std::move(symbol_stack.top());
             lvalue = _current_node->get_address();
             builder.Insert(new llvm::StoreInst(rvalue, lvalue, false, *Align));
         }
-        current_node->set_function(std::pair(fn, params.is_static));
         llvm::verifyFunction(*current_node->get_function().first, &llvm::errs());
     }
 

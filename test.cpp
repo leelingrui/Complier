@@ -13,6 +13,10 @@
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/PassInstrumentation.h>
 #include <llvm/Passes/PassBuilder.h>
+#include <llvm/CodeGen/MachineFunctionPass.h>
+#include <llvm/CodeGen/LiveInterval.h>
+#include <llvm/CodeGen/SelectionDAGISel.h>
+#include <llvm/CodeGen/Register.h>
 #include <iostream>
 #include <Parser.h>
 
@@ -22,7 +26,9 @@
 #include <fstream>
 #include <iterator>
 #include <Expression.h>
-
+#include <CodeGen.h>
+#include <VM.h>
+#include <magic_enum.hpp>
 
 using namespace llvm;
 
@@ -115,22 +121,33 @@ public:
 
 int main()
 {
+    // llvm::SelectionDAGISel dag;
     std::fstream fs("D:\\Cfile\\Complier\\testparser.lpp", std::ios::in);
+    std::error_code err;
+    raw_fd_stream output("D:\\Cfile\\Complier\\testparser.ll", err);
     lpp::Parser parser(&fs);
 	std::unique_ptr<llvm::Module> mod = parser.parse();
-    PassBuilder PB;
-    LoopAnalysisManager LAM;
-    FunctionAnalysisManager FAM;
-    CGSCCAnalysisManager CGAM;
-    ModuleAnalysisManager MAM;
-    PB.registerModuleAnalyses(MAM);
-    PB.registerCGSCCAnalyses(CGAM);
-    PB.registerFunctionAnalyses(FAM);
-    PB.registerLoopAnalyses(LAM);
-    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-    ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O0);
-    MPM.run(*mod, MAM);
-    mod->print(errs(), nullptr);
+    lpp::CodeGenerator codegen;
+    // PassBuilder PB;
+    // LoopAnalysisManager LAM;
+    // FunctionAnalysisManager FAM;
+    // CGSCCAnalysisManager CGAM;
+    // ModuleAnalysisManager MAM;
+    // PB.registerModuleAnalyses(MAM);
+    // PB.registerCGSCCAnalyses(CGAM);
+    // PB.registerFunctionAnalyses(FAM);
+    // PB.registerLoopAnalyses(LAM);
+    // PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+    // ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O0);
+    // MPM.run(*mod, MAM);
+    mod->print(output, nullptr);
+    // codegen.GenerateAsm(std::move(mod));
+    // MCRegister reg2(1);
+    // MCRegister reg2(2);
+    // RAGreedy RAG;
+    // TargetRegisterClass regs;
+    // RAG.selectOrSplit()
+    // MachinePM.addPass(RAG);
     InitializeNativeTarget();
     InitializeNativeTargetAsmPrinter();
     InitializeNativeTargetAsmParser();

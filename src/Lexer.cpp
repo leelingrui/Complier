@@ -360,7 +360,6 @@ namespace lpp
                 throw std::exception(e);
             }
             
-            
             switch (linebuf[column + token_size])
             {
             case '.':
@@ -402,7 +401,6 @@ namespace lpp
             }
             case 'i':
             {
-                size_t shuffix_size;
                 int size = std::stoi(linebuf.data() + column + token_size + 1, &shuffix_size);
                 switch (size)
                 {
@@ -439,7 +437,6 @@ namespace lpp
             {
                 uvalue = static_cast<size_t>(value);
     unsigned_process:
-                size_t shuffix_size;
                 int size = std::stoi(linebuf.data() + column + token_size + 1, &shuffix_size);
                 switch (size)
                 {
@@ -493,7 +490,7 @@ namespace lpp
                 }
                 break;
             }
-            case ',': case ' ': case ';': case '\\': case '\t': case ')': case ']':
+            case ',': case ' ': case ';': case '\\': case '\t': case ')': case ']': case '\0':
             {
                 if(value < LONG_MAX && value > LONG_MIN) digit = static_cast<long>(value);
                 else throw std::out_of_range("literal out of range for `i32`");

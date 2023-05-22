@@ -4,26 +4,26 @@
         "cwd": "${workspaceRoot}/build"
     },
     "tasks": [
+        // {
+        //     "label": "MinGW Build",
+        //     "type": "shell",
+        //     "command": "cmake",
+        //     "args": [
+        //         "-G",
+        //         "MinGW Makefiles",
+        //         ".."
+        //     ]
+        // },
         {
-            "label": "CMake",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "MinGW Makefiles",
-                ".."
-            ]
-        },
-        {
-            "label": "MinGW build",
+            "label": "MinGW Build",
             "type": "shell",
             "command": "mingw32-make",
             "args": [
-                "-j24"
             ],
             "group": "build",
-            "dependsOn": [
-                "cmake"
-            ]
+            // "dependsOn": [
+            //     "cmake"
+            // ]
         },
     ]
 }

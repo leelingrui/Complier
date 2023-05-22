@@ -41,11 +41,13 @@ namespace lpp
         llvm::BasicBlock* return_block;
         std::vector<llvm::BasicBlock*> basic_blocks;
         llvm::BasicBlock::iterator inserter;
+        llvm::Type* return_type;
         bool is_static, is_var_args;
         inline void clear()
         {
             arg_name.clear();
             arg_type.clear();
+            return_type = nullptr;
             return_block = nullptr;
             function_name.clear();
             basic_blocks.clear();
@@ -60,7 +62,8 @@ namespace lpp
         void enter_scope();
         void leave_scope();
         void insert_function(FuncParam& func_param, const llvm::DataLayout &DL);
-        void set_function(llvm::Module* m, FuncParam func_param, llvm::Type* return_type, const llvm::DataLayout& DL);
+        void declear_function(llvm::Module*m , FuncParam& func_params);
+        void define_function(llvm::Module* m, FuncParam& func_params, const llvm::DataLayout& DL);
         const std::pair<llvm::Function*, bool> find_function(llvm::StringRef Name) const;
         BlockScopeNode* find_value(llvm::StringRef Name);
         llvm::ArrayRef<llvm::Value*> get_current_value_accept_seq();
@@ -219,6 +222,8 @@ namespace lpp
             }
             else return false;
         }
+        void leave_parentheses();
+        void enter_parentheses();
         void start_while_condition();
         void start_if_condition();
         void end_while_body();
@@ -242,6 +247,9 @@ namespace lpp
         void function_body_define_strart();
         void function_body_define_finished();
         void reduce_condition_calculate();
+        void get_function_return_type();
+        void function_declear();
+        void has_return_type_function_define();
         inline bool static is_punc(const parser_input& _Token);
         inline bool static current_token_is_star(const Token& _Token);
         inline bool static is_rbarces(const Token& _Token);
@@ -253,6 +261,7 @@ namespace lpp
         static bool invocable(const parser_input& tken);
         void sovle_unary(Punchation punc);
         llvm::Value* get_value(parser_input& input, llvm::Type* rvalue_type = nullptr, bool load_effective_address = false, bool reset_value = false);
+        std::stack<uint8_t> priority_stack;
         std::pair<llvm::Function*, bool> get_callee(parser_input& input, llvm::ArrayRef<llvm::Value*> args);
         static bool is_comma(const parser_input& punc);
         BlockScopeManager block_scope_manager;

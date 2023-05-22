@@ -1,5 +1,4 @@
 #include <Assemblier.h>
-
 namespace lpp
 {
     

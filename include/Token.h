@@ -89,7 +89,7 @@ namespace lpp
         AND,
         OR,
         SCOUP,
-        POINTERTO          // 23 结束。
+        POINTERTO
     };
     struct lppIdentifierView
     {
